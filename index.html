@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Catálogo Dinámico</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>Mi Catálogo Personalizado 🏬</h1>
+    <div id="cart-counter">🛒 Carrito: 0</div>
+  </header>
+  <main>
+    <div id="filters">
+      <input type="text" id="search" placeholder="Buscar productos... 🔍">
+      <select id="category-filter">
+        <option value="">Todas las categorías</option>
+      </select>
+    </div>
+    <div id="products"></div>
+    <div id="cart">
+      <h2>Tu Carrito 🛍️</h2>
+      <div id="cart-items"></div>
+      <input type="text" id="customer-name" placeholder="Tu nombre">
+      <select id="delivery-method">
+        <option value="Domicilio">Domicilio 🚚</option>
+        <option value="Recogida">Recogida en tienda 🏪</option>
+      </select>
+      <select id="payment-method">
+        <option value="Transferencia">Transferencia 💸</option>
+        <option value="Efectivo">Efectivo 💵</option>
+      </select>
+      <button onclick="sendOrder()">Enviar Pedido por WhatsApp 📲</button>
+    </div>
+  </main>
+  <script src="script.js"></script>
+</body>
+</html>
