@@ -1,6 +1,6 @@
 // Configuración de la aplicación
 const CONFIG = {
-  API_URL: "https://script.google.com/macros/s/AKfycbxpFDWsrhMFB5xKTPmYXtbdS6Ul4ZQCaX0_xhLyBe7c5HtsXMzi_4MogZXTnTwq7hiinw/exec",
+  API_URL: "https://script.google.com/macros/s/AKfycbx7RtyFhGGh2jlSXKwwsMkpBbLNW944mCfr5NLChV3mPaCkLait7gQcpfQRLAGI_pmdkQ/exec",
   SHIPPING_COST: 5.00,
   LOW_STOCK_THRESHOLD: 5,
   WHATSAPP_NUMBER: "+584245314252",
@@ -84,7 +84,14 @@ async function loadProducts() {
     const response = await fetch(`${CONFIG.API_URL}?action=getProducts`);
     if (!response.ok) throw new Error("Error al cargar productos");
     
-    STATE.products = await response.json();
+    const responseData = await response.json();
+    
+    // Verificar la estructura de la respuesta
+    if (responseData.status !== "success") {
+      throw new Error(responseData.message || "Error en la respuesta del servidor");
+    }
+    
+    STATE.products = responseData.data;
     STATE.filteredProducts = [...STATE.products];
     
     populateCategories();
@@ -356,4 +363,146 @@ function updateCartCounter() {
 // Alternar visibilidad del carrito
 function toggleCart() {
   STATE.isCartOpen = !STATE.isCartOpen;
+  DOM.cartSidebar.classList.toggle("open", STATE.isCartOpen);
+  DOM.cartOverlay.classList.toggle("active", STATE.isCartOpen);
   
+  // Bloquear scroll del body cuando el carrito está abierto
+  document.body.style.overflow = STATE.isCartOpen ? "hidden" : "auto";
+}
+
+// Cerrar carrito
+function closeCart() {
+  STATE.isCartOpen = false;
+  DOM.cartSidebar.classList.remove("open");
+  DOM.cartOverlay.classList.remove("active");
+  document.body.style.overflow = "auto";
+}
+
+// Manejar el proceso de compra
+async function handleCheckout(e) {
+  e.preventDefault();
+  
+  // Obtener valores del formulario
+  const customerName = DOM.customerName.value.trim();
+  const customerPhone = DOM.customerPhone.value.trim();
+  const deliveryMethod = DOM.deliveryMethod.value;
+  const paymentMethod = DOM.paymentMethod.value;
+  
+  // Validar datos
+  if (!customerName || !customerPhone || STATE.cart.length === 0) {
+    showNotification("Por favor, completa todos los campos y añade productos al carrito", "error");
+    return;
+  }
+  
+  // Construir objeto de pedido
+  const order = {
+    customerName,
+    customerPhone,
+    deliveryMethod,
+    paymentMethod,
+    items: STATE.cart.map(item => ({
+      id: item.id,
+      name: item.name,
+      price: item.price,
+      quantity: item.quantity
+    }))
+  };
+  
+  try {
+    // Mostrar estado de carga
+    DOM.checkoutForm.querySelector("button").innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
+    DOM.checkoutForm.querySelector("button").disabled = true;
+    
+    // Enviar pedido al backend
+    const response = await fetch(`${CONFIG.API_URL}?action=saveOrder`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: `order=${encodeURIComponent(JSON.stringify(order))}`
+    });
+    
+    if (!response.ok) throw new Error("Error al guardar el pedido");
+    
+    const responseData = await response.json();
+    
+    if (responseData.status !== "success") {
+      throw new Error(responseData.message || "Error en la respuesta del servidor");
+    }
+    
+    // Mostrar mensaje de éxito
+    showNotification(`Pedido #${responseData.data.orderId} enviado con éxito!`, "success");
+    
+    // Enviar por WhatsApp
+    sendWhatsAppMessage(order, responseData.data.orderId, responseData.data.total);
+    
+    // Limpiar carrito y formulario
+    STATE.cart = [];
+    updateCart();
+    DOM.checkoutForm.reset();
+    closeCart();
+    
+  } catch (error) {
+    showNotification(error.message, "error");
+  } finally {
+    // Restaurar botón
+    DOM.checkoutForm.querySelector("button").innerHTML = '<i class="fab fa-whatsapp"></i> Completar Pedido';
+    DOM.checkoutForm.querySelector("button").disabled = false;
+  }
+}
+
+// Enviar mensaje por WhatsApp
+function sendWhatsAppMessage(order, orderId, total) {
+  // Construir mensaje detallado
+  const itemsText = order.items.map(item => 
+    `• ${item.name} - ${item.quantity} x ${CONFIG.CURRENCY}${item.price.toFixed(2)}`
+  ).join("\n");
+  
+  const message = `¡Nuevo pedido desde el catálogo online!
+  
+*ID:* ${orderId}
+*Cliente:* ${order.customerName}
+*Teléfono:* ${order.customerPhone}
+*Método de entrega:* ${order.deliveryMethod}
+*Método de pago:* ${order.paymentMethod}
+
+*Productos:*
+${itemsText}
+
+*Subtotal:* ${CONFIG.CURRENCY}${(total - CONFIG.SHIPPING_COST).toFixed(2)}
+*Envío:* ${CONFIG.CURRENCY}${(order.deliveryMethod === "Domicilio" ? CONFIG.SHIPPING_COST : 0).toFixed(2)}
+*TOTAL:* ${CONFIG.CURRENCY}${total.toFixed(2)}
+
+Por favor, procesa este pedido. ¡Gracias!`;
+  
+  // Crear URL de WhatsApp
+  const whatsappUrl = `https://wa.me/${CONFIG.WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+  
+  // Abrir en nueva pestaña
+  window.open(whatsappUrl, "_blank");
+}
+
+// Mostrar notificación
+function showNotification(message, type = "success") {
+  DOM.notification.textContent = message;
+  DOM.notification.className = "notification show";
+  
+  if (type === "error") {
+    DOM.notification.classList.add("error");
+  } else {
+    DOM.notification.classList.remove("error");
+  }
+  
+  // Ocultar después de 5 segundos
+  setTimeout(() => {
+    DOM.notification.classList.remove("show");
+  }, 5000);
+}
+
+// Iniciar la aplicación al cargar la página
+window.addEventListener("DOMContentLoaded", init);
+
+// Hacer funciones disponibles globalmente para eventos HTML
+window.addToCart = addToCart;
+window.updateCartItemQuantity = updateCartItemQuantity;
+window.removeFromCart = removeFromCart;
