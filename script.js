@@ -38,7 +38,9 @@ const DOM = {
   deliveryMethod: document.getElementById("delivery-method"),
   paymentMethod: document.getElementById("payment-method"),
   closeCart: document.getElementById("close-cart"),
-  notification: document.getElementById("notification")
+  notification: document.getElementById("notification"),
+  resetFilters: document.getElementById("reset-filters"),
+  resetSearch: document.getElementById("reset-search")
 };
 
 // Inicializar la aplicación
@@ -55,6 +57,8 @@ function setupEventListeners() {
   DOM.categoryFilter.addEventListener("change", filterProducts);
   DOM.priceFilter.addEventListener("input", updatePriceFilter);
   DOM.priceFilter.addEventListener("change", filterProducts);
+  DOM.resetFilters.addEventListener("click", resetAllFilters);
+  DOM.resetSearch.addEventListener("click", resetSearch);
   
   // Carrito
   document.querySelector(".cart-counter").addEventListener("click", toggleCart);
@@ -86,7 +90,6 @@ async function loadProducts() {
     
     const responseData = await response.json();
     
-    // Verificar la estructura de la respuesta
     if (responseData.status !== "success") {
       throw new Error(responseData.message || "Error en la respuesta del servidor");
     }
@@ -149,6 +152,22 @@ function updatePriceFilter() {
   DOM.priceValue.textContent = `Hasta ${CONFIG.CURRENCY}${DOM.priceFilter.value}`;
 }
 
+// Reiniciar todos los filtros
+function resetAllFilters() {
+  DOM.searchInput.value = "";
+  DOM.categoryFilter.value = "";
+  DOM.priceFilter.value = DOM.priceFilter.max;
+  updatePriceFilter();
+  filterProducts();
+  showNotification("Filtros reiniciados");
+}
+
+// Reiniciar búsqueda
+function resetSearch() {
+  DOM.searchInput.value = "";
+  filterProducts();
+}
+
 // Filtrar productos
 function filterProducts() {
   const searchTerm = DOM.searchInput.value.toLowerCase();
@@ -188,7 +207,7 @@ function renderProducts() {
 // Crear tarjeta de producto
 function createProductCard(product) {
   const card = document.createElement("div");
-  card.className = "product-card";
+  card.className = "product-card glass-card";
   
   // Determinar estado del stock
   let stockClass = "";
@@ -211,7 +230,7 @@ function createProductCard(product) {
   
   card.innerHTML = `
     <div class="product-image">
-      <img src="${product.image || 'https://via.placeholder.com/300x200?text=No+Image'}" alt="${product.name}">
+      <img src="${product.image || 'https://via.placeholder.com/300x200?text=No+Image'}" alt="${product.name}" loading="lazy">
       ${product.stock <= CONFIG.LOW_STOCK_THRESHOLD && product.stock > 0 ? `<span class="product-badge">¡Últimas unidades!</span>` : ''}
     </div>
     <div class="product-content">
@@ -254,6 +273,12 @@ function addToCart(productId) {
   
   updateCart();
   showNotification(`${product.name} añadido al carrito`);
+  
+  // Efecto visual en el contador del carrito
+  DOM.cartCounter.classList.add("pulse-on-update");
+  setTimeout(() => {
+    DOM.cartCounter.classList.remove("pulse-on-update");
+  }, 500);
   
   // Abrir carrito si está cerrado
   if (!STATE.isCartOpen) {
@@ -301,9 +326,12 @@ function updateCart() {
   
   if (STATE.cart.length === 0) {
     DOM.cartItems.innerHTML = `
-      <div class="empty-cart">
+      <div class="empty-cart glass-card">
         <i class="fas fa-shopping-basket"></i>
         <p>Tu carrito está vacío</p>
+        <button class="btn-primary" onclick="closeCart()">
+          <i class="fas fa-arrow-left"></i> Seguir comprando
+        </button>
       </div>
     `;
     updateCartTotals();
@@ -315,8 +343,8 @@ function updateCart() {
     cartItem.className = "cart-item";
     
     cartItem.innerHTML = `
-      <div class="cart-item-image">
-        <img src="${item.image || 'https://via.placeholder.com/100x100?text=No+Image'}" alt="${item.name}">
+      <div class="cart-item-image glass-card">
+        <img src="${item.image || 'https://via.placeholder.com/100x100?text=No+Image'}" alt="${item.name}" loading="lazy">
       </div>
       <div class="cart-item-details">
         <h4 class="cart-item-title">${item.name}</h4>
@@ -394,6 +422,12 @@ async function handleCheckout(e) {
     return;
   }
   
+  // Validar teléfono
+  if (!/^[\d\s+-]+$/.test(customerPhone)) {
+    showNotification("Por favor, ingresa un número de teléfono válido", "error");
+    return;
+  }
+  
   // Construir objeto de pedido
   const order = {
     customerName,
@@ -410,8 +444,9 @@ async function handleCheckout(e) {
   
   try {
     // Mostrar estado de carga
-    DOM.checkoutForm.querySelector("button").innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
-    DOM.checkoutForm.querySelector("button").disabled = true;
+    const submitBtn = DOM.checkoutForm.querySelector("button");
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
+    submitBtn.disabled = true;
     
     // Enviar pedido al backend
     const response = await fetch(`${CONFIG.API_URL}?action=saveOrder`, {
@@ -443,11 +478,13 @@ async function handleCheckout(e) {
     closeCart();
     
   } catch (error) {
+    console.error("Error:", error);
     showNotification(error.message, "error");
   } finally {
     // Restaurar botón
-    DOM.checkoutForm.querySelector("button").innerHTML = '<i class="fab fa-whatsapp"></i> Completar Pedido';
-    DOM.checkoutForm.querySelector("button").disabled = false;
+    const submitBtn = DOM.checkoutForm.querySelector("button");
+    submitBtn.innerHTML = '<i class="fab fa-whatsapp"></i> Confirmar Pedido';
+    submitBtn.disabled = false;
   }
 }
 
@@ -506,3 +543,4 @@ window.addEventListener("DOMContentLoaded", init);
 window.addToCart = addToCart;
 window.updateCartItemQuantity = updateCartItemQuantity;
 window.removeFromCart = removeFromCart;
+window.toggleCart = toggleCart;
