@@ -3,37 +3,128 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Catálogo Dinámico</title>
+  <meta name="description" content="Catálogo de productos personalizados con carrito de compras">
+  <title>Catálogo Premium | Tienda Online</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛍️</text></svg>">
 </head>
 <body>
   <header>
-    <h1>Mi Catálogo Personalizado 🏬</h1>
-    <div id="cart-counter">🛒 Carrito: 0</div>
+    <div class="header-content">
+      <h1><i class="fas fa-store-alt"></i> Catálogo Premium</h1>
+      <div id="cart-counter" class="cart-counter">
+        <i class="fas fa-shopping-cart"></i>
+        <span id="cart-count">0</span>
+      </div>
+    </div>
   </header>
-  <main>
-    <div id="filters">
-      <input type="text" id="search" placeholder="Buscar productos... 🔍">
-      <select id="category-filter">
-        <option value="">Todas las categorías</option>
-      </select>
+
+  <div class="container">
+    <aside class="sidebar">
+      <div class="filters">
+        <h2><i class="fas fa-filter"></i> Filtros</h2>
+        <div class="search-box">
+          <i class="fas fa-search"></i>
+          <input type="text" id="search" placeholder="Buscar productos...">
+        </div>
+        <div class="filter-group">
+          <label for="category-filter"><i class="fas fa-tags"></i> Categoría</label>
+          <select id="category-filter">
+            <option value="">Todas las categorías</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="price-filter"><i class="fas fa-dollar-sign"></i> Rango de precios</label>
+          <div class="price-range">
+            <input type="range" id="price-filter" min="0" max="1000" value="1000" step="10">
+            <span id="price-value">Hasta $1000</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <main>
+      <section class="products-section">
+        <div id="products-loader" class="loader">
+          <div class="spinner"></div>
+          <p>Cargando productos...</p>
+        </div>
+        <div id="products" class="products-grid"></div>
+        <div id="no-products" class="no-products">
+          <i class="fas fa-box-open"></i>
+          <p>No se encontraron productos</p>
+        </div>
+      </section>
+    </main>
+
+    <div id="cart-sidebar" class="cart-sidebar">
+      <div class="cart-header">
+        <h2><i class="fas fa-shopping-basket"></i> Tu Carrito</h2>
+        <button id="close-cart" class="close-cart"><i class="fas fa-times"></i></button>
+      </div>
+      <div id="cart-items" class="cart-items"></div>
+      <div class="cart-summary">
+        <div class="summary-row">
+          <span>Subtotal:</span>
+          <span id="subtotal">$0.00</span>
+        </div>
+        <div class="summary-row">
+          <span>Envío:</span>
+          <span id="shipping">$0.00</span>
+        </div>
+        <div class="summary-row total">
+          <span>Total:</span>
+          <span id="total">$0.00</span>
+        </div>
+      </div>
+      <form id="checkout-form" class="checkout-form">
+        <div class="form-group">
+          <label for="customer-name"><i class="fas fa-user"></i> Nombre completo</label>
+          <input type="text" id="customer-name" placeholder="Ingresa tu nombre" required>
+        </div>
+        <div class="form-group">
+          <label for="customer-phone"><i class="fas fa-phone"></i> Teléfono</label>
+          <input type="tel" id="customer-phone" placeholder="Ingresa tu teléfono" required>
+        </div>
+        <div class="form-group">
+          <label for="delivery-method"><i class="fas fa-truck"></i> Método de entrega</label>
+          <select id="delivery-method" required>
+            <option value="" disabled selected>Selecciona una opción</option>
+            <option value="Domicilio">Domicilio (+$5.00)</option>
+            <option value="Recogida">Recogida en tienda</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="payment-method"><i class="fas fa-credit-card"></i> Método de pago</label>
+          <select id="payment-method" required>
+            <option value="" disabled selected>Selecciona una opción</option>
+            <option value="Transferencia">Transferencia bancaria</option>
+            <option value="Efectivo">Efectivo al recibir</option>
+            <option value="Tarjeta">Tarjeta de crédito</option>
+          </select>
+        </div>
+        <button type="submit" class="checkout-btn">
+          <i class="fab fa-whatsapp"></i> Completar Pedido
+        </button>
+      </form>
     </div>
-    <div id="products"></div>
-    <div id="cart">
-      <h2>Tu Carrito 🛍️</h2>
-      <div id="cart-items"></div>
-      <input type="text" id="customer-name" placeholder="Tu nombre">
-      <select id="delivery-method">
-        <option value="Domicilio">Domicilio 🚚</option>
-        <option value="Recogida">Recogida en tienda 🏪</option>
-      </select>
-      <select id="payment-method">
-        <option value="Transferencia">Transferencia 💸</option>
-        <option value="Efectivo">Efectivo 💵</option>
-      </select>
-      <button onclick="sendOrder()">Enviar Pedido por WhatsApp 📲</button>
+    <div id="cart-overlay" class="cart-overlay"></div>
+  </div>
+
+  <footer>
+    <div class="footer-content">
+      <p>© 2023 Catálogo Premium. Todos los derechos reservados.</p>
+      <div class="social-links">
+        <a href="#" aria-label="Facebook"><i class="fab fa-facebook"></i></a>
+        <a href="#" aria-label="Instagram"><i class="fab fa-instagram"></i></a>
+        <a href="#" aria-label="WhatsApp"><i class="fab fa-whatsapp"></i></a>
+      </div>
     </div>
-  </main>
+  </footer>
+
+  <div id="notification" class="notification"></div>
+
   <script src="script.js"></script>
 </body>
 </html>
