@@ -3,7 +3,7 @@ const CONFIG = {
   API_URL: "https://script.google.com/macros/s/AKfycbx7RtyFhGGh2jlSXKwwsMkpBbLNW944mCfr5NLChV3mPaCkLait7gQcpfQRLAGI_pmdkQ/exec",
   SHIPPING_COST: 5.00,
   LOW_STOCK_THRESHOLD: 5,
-  WHATSAPP_NUMBER: "+584245314252",
+  WHATSAPP_NUMBER: "+584166367466",
   CURRENCY: "$"
 };
 
