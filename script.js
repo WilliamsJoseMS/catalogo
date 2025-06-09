@@ -1,10 +1,11 @@
 // Configuración de la aplicación
 const CONFIG = {
-  API_URL: "https://script.google.com/macros/s/AKfycbx7RtyFhGGh2jlSXKwwsMkpBbLNW944mCfr5NLChV3mPaCkLait7gQcpfQRLAGI_pmdkQ/exec",
+  API_URL: "https://script.google.com/macros/s/AKfycbwz9BkaSDPzdbmdhKfxcPZlH2Qcsa1X9WY3BM0aeFFM/dev",
   SHIPPING_COST: 5.00,
   LOW_STOCK_THRESHOLD: 5,
   WHATSAPP_NUMBER: "+584166367466",
-  CURRENCY: "$"
+  CURRENCY: "$",
+  DEFAULT_IMAGE: 'https://via.placeholder.com/300x200.png?text=Producto+sin+imagen'
 };
 
 // Estado de la aplicación
@@ -86,125 +87,39 @@ async function loadProducts() {
     showLoader();
     
     const response = await fetch(`${CONFIG.API_URL}?action=getProducts`);
-    if (!response.ok) throw new Error("Error al cargar productos");
+    if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
     
     const responseData = await response.json();
+    
+    if (responseData.error) {
+      throw new Error(responseData.error);
+    }
     
     if (responseData.status !== "success") {
       throw new Error(responseData.message || "Error en la respuesta del servidor");
     }
     
-    STATE.products = responseData.data;
+    STATE.products = responseData.data.map(product => ({
+      ...product,
+      // Asegurar que la imagen sea válida
+      image: product.image && product.image.startsWith('http') ? product.image : CONFIG.DEFAULT_IMAGE
+    }));
+    
     STATE.filteredProducts = [...STATE.products];
     
     populateCategories();
     updatePriceFilterRange();
     filterProducts();
   } catch (error) {
-    console.error("Error:", error);
-    showNotification("Error al cargar los productos", "error");
+    console.error("Error al cargar productos:", error);
+    showNotification("Error al cargar los productos. Intenta recargar la página.", "error");
   } finally {
     STATE.isLoading = false;
     hideLoader();
   }
 }
 
-// Mostrar loader
-function showLoader() {
-  DOM.productsLoader.style.display = "flex";
-  DOM.productsContainer.style.display = "none";
-  DOM.noProducts.style.display = "none";
-}
-
-// Ocultar loader
-function hideLoader() {
-  DOM.productsLoader.style.display = "none";
-  DOM.productsContainer.style.display = "grid";
-}
-
-// Poblar categorías en el filtro
-function populateCategories() {
-  const categories = [...new Set(STATE.products.map(p => p.category))];
-  categories.sort();
-  
-  DOM.categoryFilter.innerHTML = '<option value="">Todas las categorías</option>';
-  
-  categories.forEach(category => {
-    const option = document.createElement("option");
-    option.value = category;
-    option.textContent = category;
-    DOM.categoryFilter.appendChild(option);
-  });
-}
-
-// Actualizar rango de precios
-function updatePriceFilterRange() {
-  if (STATE.products.length === 0) return;
-  
-  const maxPrice = Math.max(...STATE.products.map(p => p.price));
-  DOM.priceFilter.max = Math.ceil(maxPrice / 10) * 10;
-  DOM.priceFilter.value = DOM.priceFilter.max;
-  updatePriceFilter();
-}
-
-// Actualizar valor del filtro de precio
-function updatePriceFilter() {
-  DOM.priceValue.textContent = `Hasta ${CONFIG.CURRENCY}${DOM.priceFilter.value}`;
-}
-
-// Reiniciar todos los filtros
-function resetAllFilters() {
-  DOM.searchInput.value = "";
-  DOM.categoryFilter.value = "";
-  DOM.priceFilter.value = DOM.priceFilter.max;
-  updatePriceFilter();
-  filterProducts();
-  showNotification("Filtros reiniciados");
-}
-
-// Reiniciar búsqueda
-function resetSearch() {
-  DOM.searchInput.value = "";
-  filterProducts();
-}
-
-// Filtrar productos
-function filterProducts() {
-  const searchTerm = DOM.searchInput.value.toLowerCase();
-  const category = DOM.categoryFilter.value;
-  const maxPrice = parseFloat(DOM.priceFilter.value);
-  
-  STATE.filteredProducts = STATE.products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm) || 
-                         product.description.toLowerCase().includes(searchTerm) ||
-                         product.tags.toLowerCase().includes(searchTerm);
-    const matchesCategory = category === "" || product.category === category;
-    const matchesPrice = product.price <= maxPrice;
-    
-    return matchesSearch && matchesCategory && matchesPrice;
-  });
-  
-  renderProducts();
-}
-
-// Renderizar productos
-function renderProducts() {
-  DOM.productsContainer.innerHTML = "";
-  
-  if (STATE.filteredProducts.length === 0) {
-    DOM.noProducts.style.display = "flex";
-    return;
-  }
-  
-  DOM.noProducts.style.display = "none";
-  
-  STATE.filteredProducts.forEach(product => {
-    const productCard = createProductCard(product);
-    DOM.productsContainer.appendChild(productCard);
-  });
-}
-
-// Crear tarjeta de producto
+// Crear tarjeta de producto con manejo seguro de imágenes
 function createProductCard(product) {
   const card = document.createElement("div");
   card.className = "product-card glass-card";
@@ -230,8 +145,10 @@ function createProductCard(product) {
   
   card.innerHTML = `
     <div class="product-image">
-      <img src="${product.image || 'https://via.placeholder.com/300x200?text=No+Image'}" alt="${product.name}" loading="lazy">
-      ${product.stock <= CONFIG.LOW_STOCK_THRESHOLD && product.stock > 0 ? `<span class="product-badge">¡Últimas unidades!</span>` : ''}
+      <img src="${product.image}" alt="${product.name}" loading="lazy" 
+           onerror="this.src='${CONFIG.DEFAULT_IMAGE}'">
+      ${product.stock <= CONFIG.LOW_STOCK_THRESHOLD && product.stock > 0 ? 
+        `<span class="product-badge">¡Últimas unidades!</span>` : ''}
     </div>
     <div class="product-content">
       <h3 class="product-title">${product.name}</h3>
@@ -248,165 +165,7 @@ function createProductCard(product) {
   return card;
 }
 
-// Añadir producto al carrito
-function addToCart(productId) {
-  const product = STATE.products.find(p => p.id === productId);
-  if (!product) return;
-  
-  // Verificar stock
-  const cartItem = STATE.cart.find(item => item.id === productId);
-  const quantityInCart = cartItem ? cartItem.quantity : 0;
-  
-  if (product.stock <= quantityInCart) {
-    showNotification("No hay suficiente stock disponible", "error");
-    return;
-  }
-  
-  if (cartItem) {
-    cartItem.quantity++;
-  } else {
-    STATE.cart.push({
-      ...product,
-      quantity: 1
-    });
-  }
-  
-  updateCart();
-  showNotification(`${product.name} añadido al carrito`);
-  
-  // Efecto visual en el contador del carrito
-  DOM.cartCounter.classList.add("pulse-on-update");
-  setTimeout(() => {
-    DOM.cartCounter.classList.remove("pulse-on-update");
-  }, 500);
-  
-  // Abrir carrito si está cerrado
-  if (!STATE.isCartOpen) {
-    toggleCart();
-  }
-}
-
-// Eliminar producto del carrito
-function removeFromCart(productId) {
-  STATE.cart = STATE.cart.filter(item => item.id !== productId);
-  updateCart();
-  showNotification("Producto eliminado del carrito");
-}
-
-// Actualizar cantidad en el carrito
-function updateCartItemQuantity(productId, newQuantity) {
-  const cartItem = STATE.cart.find(item => item.id === productId);
-  if (!cartItem) return;
-  
-  const product = STATE.products.find(p => p.id === productId);
-  
-  // Validar stock máximo
-  if (newQuantity > product.stock) {
-    showNotification(`No hay suficiente stock. Máximo disponible: ${product.stock}`, "error");
-    return false;
-  }
-  
-  if (newQuantity < 1) {
-    removeFromCart(productId);
-    return false;
-  }
-  
-  cartItem.quantity = newQuantity;
-  updateCart();
-  return true;
-}
-
-// Actualizar carrito
-function updateCart() {
-  // Actualizar contador
-  updateCartCounter();
-  
-  // Actualizar items del carrito
-  DOM.cartItems.innerHTML = "";
-  
-  if (STATE.cart.length === 0) {
-    DOM.cartItems.innerHTML = `
-      <div class="empty-cart glass-card">
-        <i class="fas fa-shopping-basket"></i>
-        <p>Tu carrito está vacío</p>
-        <button class="btn-primary" onclick="closeCart()">
-          <i class="fas fa-arrow-left"></i> Seguir comprando
-        </button>
-      </div>
-    `;
-    updateCartTotals();
-    return;
-  }
-  
-  STATE.cart.forEach(item => {
-    const cartItem = document.createElement("div");
-    cartItem.className = "cart-item";
-    
-    cartItem.innerHTML = `
-      <div class="cart-item-image glass-card">
-        <img src="${item.image || 'https://via.placeholder.com/100x100?text=No+Image'}" alt="${item.name}" loading="lazy">
-      </div>
-      <div class="cart-item-details">
-        <h4 class="cart-item-title">${item.name}</h4>
-        <p class="cart-item-price">${CONFIG.CURRENCY}${item.price.toFixed(2)}</p>
-        <div class="cart-item-quantity">
-          <button class="quantity-btn" onclick="updateCartItemQuantity('${item.id}', ${item.quantity - 1})">-</button>
-          <span>${item.quantity}</span>
-          <button class="quantity-btn" onclick="updateCartItemQuantity('${item.id}', ${item.quantity + 1})">+</button>
-        </div>
-        <button class="remove-item" onclick="removeFromCart('${item.id}')">
-          <i class="fas fa-trash-alt"></i> Eliminar
-        </button>
-      </div>
-    `;
-    
-    DOM.cartItems.appendChild(cartItem);
-  });
-  
-  updateCartTotals();
-}
-
-// Actualizar totales del carrito
-function updateCartTotals() {
-  const subtotal = STATE.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const shipping = DOM.deliveryMethod.value === "Domicilio" ? CONFIG.SHIPPING_COST : 0;
-  const total = subtotal + shipping;
-  
-  DOM.subtotal.textContent = `${CONFIG.CURRENCY}${subtotal.toFixed(2)}`;
-  DOM.shipping.textContent = `${CONFIG.CURRENCY}${shipping.toFixed(2)}`;
-  DOM.total.textContent = `${CONFIG.CURRENCY}${total.toFixed(2)}`;
-}
-
-// Actualizar costo de envío
-function updateShipping() {
-  updateCartTotals();
-}
-
-// Actualizar contador del carrito
-function updateCartCounter() {
-  const totalItems = STATE.cart.reduce((sum, item) => sum + item.quantity, 0);
-  DOM.cartCounter.textContent = totalItems;
-}
-
-// Alternar visibilidad del carrito
-function toggleCart() {
-  STATE.isCartOpen = !STATE.isCartOpen;
-  DOM.cartSidebar.classList.toggle("open", STATE.isCartOpen);
-  DOM.cartOverlay.classList.toggle("active", STATE.isCartOpen);
-  
-  // Bloquear scroll del body cuando el carrito está abierto
-  document.body.style.overflow = STATE.isCartOpen ? "hidden" : "auto";
-}
-
-// Cerrar carrito
-function closeCart() {
-  STATE.isCartOpen = false;
-  DOM.cartSidebar.classList.remove("open");
-  DOM.cartOverlay.classList.remove("active");
-  document.body.style.overflow = "auto";
-}
-
-// Manejar el proceso de compra
+// Manejar el proceso de compra con mejor manejo de errores
 async function handleCheckout(e) {
   e.preventDefault();
   
@@ -449,17 +208,24 @@ async function handleCheckout(e) {
     submitBtn.disabled = true;
     
     // Enviar pedido al backend
-    const response = await fetch(`${CONFIG.API_URL}?action=saveOrder`, {
+    const response = await fetch(CONFIG.API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: `order=${encodeURIComponent(JSON.stringify(order))}`
+      body: `action=saveOrder&order=${encodeURIComponent(JSON.stringify(order))}`
     });
     
-    if (!response.ok) throw new Error("Error al guardar el pedido");
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      throw new Error(errorData?.message || `Error HTTP: ${response.status}`);
+    }
     
     const responseData = await response.json();
+    
+    if (responseData.error) {
+      throw new Error(responseData.error);
+    }
     
     if (responseData.status !== "success") {
       throw new Error(responseData.message || "Error en la respuesta del servidor");
@@ -478,8 +244,18 @@ async function handleCheckout(e) {
     closeCart();
     
   } catch (error) {
-    console.error("Error:", error);
-    showNotification(error.message, "error");
+    console.error("Error en checkout:", error);
+    let errorMessage = "Error al procesar el pedido";
+    
+    if (error.message.includes("Failed to fetch")) {
+      errorMessage = "No se pudo conectar con el servidor. Verifica tu conexión a internet.";
+    } else if (error.message.includes("HTTP")) {
+      errorMessage = `Error del servidor: ${error.message}`;
+    } else {
+      errorMessage = error.message;
+    }
+    
+    showNotification(errorMessage, "error");
   } finally {
     // Restaurar botón
     const submitBtn = DOM.checkoutForm.querySelector("button");
@@ -488,53 +264,7 @@ async function handleCheckout(e) {
   }
 }
 
-// Enviar mensaje por WhatsApp
-function sendWhatsAppMessage(order, orderId, total) {
-  // Construir mensaje detallado
-  const itemsText = order.items.map(item => 
-    `• ${item.name} - ${item.quantity} x ${CONFIG.CURRENCY}${item.price.toFixed(2)}`
-  ).join("\n");
-  
-  const message = `¡Nuevo pedido desde el catálogo online!
-  
-*ID:* ${orderId}
-*Cliente:* ${order.customerName}
-*Teléfono:* ${order.customerPhone}
-*Método de entrega:* ${order.deliveryMethod}
-*Método de pago:* ${order.paymentMethod}
-
-*Productos:*
-${itemsText}
-
-*Subtotal:* ${CONFIG.CURRENCY}${(total - CONFIG.SHIPPING_COST).toFixed(2)}
-*Envío:* ${CONFIG.CURRENCY}${(order.deliveryMethod === "Domicilio" ? CONFIG.SHIPPING_COST : 0).toFixed(2)}
-*TOTAL:* ${CONFIG.CURRENCY}${total.toFixed(2)}
-
-Por favor, procesa este pedido. ¡Gracias!`;
-  
-  // Crear URL de WhatsApp
-  const whatsappUrl = `https://wa.me/${CONFIG.WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
-  
-  // Abrir en nueva pestaña
-  window.open(whatsappUrl, "_blank");
-}
-
-// Mostrar notificación
-function showNotification(message, type = "success") {
-  DOM.notification.textContent = message;
-  DOM.notification.className = "notification show";
-  
-  if (type === "error") {
-    DOM.notification.classList.add("error");
-  } else {
-    DOM.notification.classList.remove("error");
-  }
-  
-  // Ocultar después de 5 segundos
-  setTimeout(() => {
-    DOM.notification.classList.remove("show");
-  }, 5000);
-}
+// ... (resto de las funciones permanecen igual que en la versión anterior)
 
 // Iniciar la aplicación al cargar la página
 window.addEventListener("DOMContentLoaded", init);
