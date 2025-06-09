@@ -1,6 +1,6 @@
 // Configuración de la aplicación
 const CONFIG = {
-  API_URL: "https://script.google.com/macros/s/AKfycbz8XHWDEKsnTdLTGVypt3wlub_oICtb7SoOFNmUIEYSbxeVbKSAx5-t3ZiLqFQ9pKDk1Q/exec",
+  API_URL: "https://script.google.com/macros/s/AKfycbxpFDWsrhMFB5xKTPmYXtbdS6Ul4ZQCaX0_xhLyBe7c5HtsXMzi_4MogZXTnTwq7hiinw/exec",
   SHIPPING_COST: 5.00,
   LOW_STOCK_THRESHOLD: 5,
   WHATSAPP_NUMBER: "+584245314252",
